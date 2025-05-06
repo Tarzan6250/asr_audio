@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lyrics Extractor</title>
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.89/build/spline-viewer.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Arial', sans-serif;
+    }
+    
+    body {
+      overflow: hidden;
+      color: white;
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    .spline-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+    }
+    
+    .content {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+      text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+      text-align: center;
+    }
+    
+    .upload-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      width: 100%;
+      max-width: 500px;
+    }
+    
+    .file-input-container {
+      position: relative;
+      width: 100%;
+    }
+    
+    #audioFile {
+      opacity: 0;
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      z-index: 2;
+    }
+    
+    .file-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px dashed white;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .file-label:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #6c63ff;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    button:hover {
+      background: #5a52e0;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+    
+    .lyrics-dialog {
+      width: 100%;
+      max-width: 600px;
+      max-height: 0;
+      overflow: hidden;
+      background: rgba(30, 30, 40, 0.9);
+      border-radius: 10px;
+      margin-top: 20px;
+      transition: all 0.5s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+    }
+    
+    .lyrics-dialog.show {
+      max-height: 400px;
+      opacity: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    .lyrics-content {
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    
+    .lyrics-line {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      animation: fadeIn 0.5s ease-in-out;
+      animation-fill-mode: both;
+      display: flex;
+    }
+    
+    .lyrics-line:last-child {
+      border-bottom: none;
+    }
+    
+    .timestamp {
+      min-width: 70px;
+      color: #6c63ff;
+      font-weight: bold;
+      margin-right: 15px;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .line-text {
+      flex: 1;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .loading {
+      display: none;
+      margin: 20px 0;
+    }
+    
+    .loading.show {
+      display: block;
+      text-align: center;
+    }
+    
+    .progress-container {
+      width: 100%;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    
+    .progress-bar {
+      height: 10px;
+      background: linear-gradient(90deg, #6c63ff, #a5a1ff);
+      border-radius: 10px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .progress-text {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.9);
+      margin-top: 5px;
+      font-weight: bold;
+    }
+    
+    .progress-percentage {
+      font-size: 1rem;
+      color: #6c63ff;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .file-name {
+      margin-top: 5px;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+      text-align: center;
+      display: none;
+    }
+    
+    .file-name.show {
+      display: block;
+    }
+    
+    .language-selector {
+      width: 100%;
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(108, 99, 255, 0.1);
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(108, 99, 255, 0.3);
+    }
+    
+    .language-selector label {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1rem;
+      font-weight: bold;
+    }
+    
+    .language-selector select {
+      flex: 1;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+    
+    .language-selector select:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .language-selector select option {
+      background: #1e1e28;
+    }
+    
+    .detected-language {
+      margin-top: 5px;
+      font-size: 0.9rem;
+      color: #6c63ff;
+      text-align: center;
+      font-style: italic;
+      display: none;
+    }
+    
+    .detected-language.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="spline-container">
+    <spline-viewer url="https://prod.spline.design/q4J7gk3lZgzLhxhe/scene.splinecode"></spline-viewer>
+  </div>
+  
+  <div class="content">
+    <h1>Upload MP3 and Extract Lyrics</h1>
+    
+    <div class="upload-container">
+      <div class="file-input-container">
+        <input type="file" id="audioFile" accept=".mp3" />
+        <div class="file-label">Choose MP3 file or drag & drop here</div>
+      </div>
+      
+      <div class="file-name" id="fileName"></div>
+      
+      <div class="language-selector">
+        <label for="languageSelect">Select Language:</label>
+        <select id="languageSelect">
+          <option value="en">English</option>
+          <option value="ta">Tamil</option>
+          <option value="hi">Hindi</option>
+          <option value="te">Telugu</option>
+          <option value="ml">Malayalam</option>
+          <option value="kn">Kannada</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="es">Spanish</option>
+          <option value="ja">Japanese</option>
+          <option value="zh">Chinese</option>
+        </select>
+      </div>
+      
+      <button onclick="uploadFile()">Upload & Transcribe</button>
+      
+      <div class="loading" id="loadingIndicator">
+        <div class="progress-percentage" id="progressPercentage">0%</div>
+        <div class="progress-container">
+          <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <p class="progress-text" id="progressText">Preparing to extract lyrics...</p>
+      </div>
+      
+      <div class="detected-language" id="detectedLanguage"></div>
+      
+      <div class="lyrics-dialog" id="lyricsDialog">
+        <div class="lyrics-content" id="lyricsBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // File input handling
+    const audioFile = document.getElementById('audioFile');
+    const fileName = document.getElementById('fileName');
+    const fileLabel = document.querySelector('.file-label');
+    
+    audioFile.addEventListener('change', function() {
+      if (this.files.length) {
+        fileName.textContent = this.files[0].name;
+        fileName.classList.add('show');
+        fileLabel.textContent = 'File selected';
+      } else {
+        fileName.classList.remove('show');
+        fileLabel.textContent = 'Choose MP3 file or drag & drop here';
+      }
+    });
+    
+    // Drag and drop functionality
+    const dropArea = document.querySelector('.file-input-container');
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight() {
+      dropArea.querySelector('.file-label').classList.add('highlight');
+    }
+    
+    function unhighlight() {
+      dropArea.querySelector('.file-label').classList.remove('highlight');
+    }
+    
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      
+      if (files.length && files[0].type.includes('audio/')) {
+        audioFile.files = files;
+        const event = new Event('change');
+        audioFile.dispatchEvent(event);
+      }
+    }
+    
+    // Function to update progress bar
+    async function checkProgress() {
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const progressPercentage = document.getElementById('progressPercentage');
+      
+      // Start progress polling
+      const pollInterval = setInterval(async () => {
+        try {
+          // Add cache-busting parameter to prevent caching
+          const timestamp = new Date().getTime();
+          const response = await fetch(`http://127.0.0.1:5000/progress?t=${timestamp}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          // Check if response is JSON
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            console.error('Response is not JSON:', contentType);
+            return;
+          }
+          
+          const data = await response.json();
+          
+          // Update progress bar
+          const progress = data.progress || 0;
+          progressBar.style.width = `${progress}%`;
+          progressPercentage.textContent = `${progress}%`;
+          progressText.textContent = data.message || 'Processing...';
+          
+          // If complete or error, stop polling
+          if (data.status === 'complete' || data.status === 'error') {
+            clearInterval(pollInterval);
+          }
+        } catch (error) {
+          console.error('Error checking progress:', error);
+        }
+      }, 500); // Check every 500ms
+      
+      return pollInterval;
+    }
+    
+    // Upload and transcribe functionality
+    async function uploadFile() {
+      const fileInput = document.getElementById('audioFile');
+      const languageSelect = document.getElementById('languageSelect');
+      const loadingIndicator = document.getElementById('loadingIndicator');
+      const lyricsDialog = document.getElementById('lyricsDialog');
+      const lyricsBox = document.getElementById('lyricsBox');
+      const detectedLanguage = document.getElementById('detectedLanguage');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      const progressPercentage = document.getElementById('progressPercentage');
+      
+      if (!fileInput.files.length) {
+        return alert('Please upload an MP3 file.');
+      }
+      
+      // Show loading indicator and reset progress
+      loadingIndicator.classList.add('show');
+      lyricsDialog.classList.remove('show');
+      progressBar.style.width = '0%';
+      progressPercentage.textContent = '0%';
+      progressText.textContent = 'Preparing to extract lyrics...';
+      
+      // Reset language display
+      detectedLanguage.textContent = '';
+      detectedLanguage.classList.remove('show');
+      
+      // Clear previous content
+      lyricsBox.innerHTML = '';
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        
+        // Add language preference if selected
+        if (languageSelect.value) {
+          formData.append('language', languageSelect.value);
+        }
+        
+        // Start progress checking
+        const progressInterval = checkProgress();
+        
+        const response = await fetch('http://127.0.0.1:5000/transcribe', {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error(`Response is not JSON: ${contentType}. Server may be returning HTML error page.`);
+        }
+        
+        const data = await response.json();
+        
+        // Hide loading indicator
+        loadingIndicator.classList.remove('show');
+        
+        // Show the selected language
+        const languageNames = {
+          'en': 'English',
+          'ta': 'Tamil',
+          'hi': 'Hindi',
+          'te': 'Telugu',
+          'ml': 'Malayalam',
+          'kn': 'Kannada',
+          'fr': 'French',
+          'de': 'German',
+          'es': 'Spanish',
+          'ja': 'Japanese',
+          'zh': 'Chinese'
+        };
+        
+        const selectedLang = languageSelect.value;
+        const displayName = languageNames[selectedLang] || selectedLang;
+        detectedLanguage.textContent = `Transcribing in: ${displayName}`;
+        detectedLanguage.classList.add('show');
+        
+        // Show lyrics dialog
+        lyricsDialog.classList.add('show');
+        
+        if (data.error) {
+          const errorElement = document.createElement('div');
+          errorElement.className = 'lyrics-line';
+          errorElement.textContent = data.error;
+          lyricsBox.appendChild(errorElement);
+        } else if (data.segments && data.segments.length > 0) {
+          // Display segments with timestamps
+          data.segments.forEach((segment, index) => {
+            const lineElement = document.createElement('div');
+            lineElement.className = 'lyrics-line';
+            lineElement.style.animationDelay = `${index * 0.1}s`;
+            
+            // Create timestamp element
+            const timestampElement = document.createElement('div');
+            timestampElement.className = 'timestamp';
+            timestampElement.textContent = `${segment.start}`;
+            
+            // Create text element
+            const textElement = document.createElement('div');
+            textElement.className = 'line-text';
+            textElement.textContent = segment.text;
+            
+            // Append elements to line
+            lineElement.appendChild(timestampElement);
+            lineElement.appendChild(textElement);
+            
+            // Append line to lyrics box
+            lyricsBox.appendChild(lineElement);
+          });
+        } else {
+          // Fallback in case segments aren't available
+          const fullText = data.full_text || 'No lyrics found';
+          const lines = fullText.split(/\r?\n/).filter(line => line.trim() !== '');
+          
+          lines.forEach((line, index) => {
+            const lineElement = document.createElement('div');
+            lineElement.className = 'lyrics-line';
+            lineElement.textContent = line;
+            lineElement.style.animationDelay = `${index * 0.1}s`;
+            lyricsBox.appendChild(lineElement);
+          });
+        }
+        
+      } catch (error) {
+        console.error('Error:', error);
+        loadingIndicator.classList.remove('show');
+        
+        // Stop progress checking if it's running
+        if (typeof progressInterval !== 'undefined') {
+          clearInterval(progressInterval);
+        }
+        
+        // Update progress to show error
+        progressBar.style.width = '100%';
+        progressBar.style.backgroundColor = '#ff6363';
+        progressPercentage.textContent = 'Error';
+        progressText.textContent = 'Transcription failed';
+        
+        // Clear previous content
+        lyricsBox.innerHTML = '';
+        
+        // Create error message with structured format
+        const lineElement = document.createElement('div');
+        lineElement.className = 'lyrics-line';
+        
+        // Create timestamp element (empty for error)
+        const timestampElement = document.createElement('div');
+        timestampElement.className = 'timestamp';
+        timestampElement.textContent = '--:--';
+        
+        // Create text element
+        const textElement = document.createElement('div');
+        textElement.className = 'line-text';
+        textElement.textContent = error.message || 'An error occurred while processing your request.';
+        
+        // Append elements to line
+        lineElement.appendChild(timestampElement);
+        lineElement.appendChild(textElement);
+        
+        lyricsBox.appendChild(lineElement);
+        
+        lyricsDialog.classList.add('show');
+        
+        // Hide language detection for errors
+        detectedLanguage.classList.remove('show');
+      }
+    }
+  </script>
+</body>
+</html>
